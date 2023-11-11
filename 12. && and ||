@@ -1,0 +1,119 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <ctype.h>
+
+#define PROMPT "$ "
+
+typedef struct command_t {
+  char *argv[1024];
+  int argc;
+} command_t;
+
+int execute_command(command_t *command) {
+  if (command->argc == 0) {
+    return 0;
+  }
+
+  // Check for builtin commands.
+  if (strcmp(command->argv[0], "exit") == 0) {
+    if (command->argc > 1) {
+      // If an argument is given, parse it as an integer.
+      int status = strtol(command->argv[1], NULL, 10);
+      if (status < 0 || status > 255) {
+        fprintf(stderr, "Invalid exit status: %s\n", command->argv[1]);
+        return 1;
+      }
+    } else {
+      status = 0;
+    }
+
+    exit(status);
+  } else if (strcmp(command->argv[0], "setenv") == 0) {
+    if (command->argc < 3) {
+      fprintf(stderr, "Usage: setenv VARIABLE VALUE\n");
+      return 1;
+    }
+
+    setenv(command->argv[1], command->argv[2], 1);
+    return 0;
+  } else if (strcmp(command->argv[0], "unsetenv") == 0) {
+    if (command->argc != 2) {
+      fprintf(stderr, "Usage: unsetenv VARIABLE\n");
+      return 1;
+    }
+
+    unsetenv(command->argv[1]);
+    return 0;
+  } else if (strcmp(command->argv[0], "cd") == 0) {
+    if (command->argc > 2) {
+      fprintf(stderr, "Usage: cd [DIRECTORY]\n");
+      return 1;
+    }
+
+    cd(command->argc == 1 ? NULL : command->argv[1]);
+    return 0;
+  }
+
+  // Execute the external command.
+  char *path = getenv("PATH");
+
+  // Iterate over the PATH variable, looking for the executable.
+  char *executable = strtok(path, ":");
+  while (executable != NULL) {
+    char full_path[1024];
+    snprintf(full_path, sizeof(full_path), "%s/%s", executable, command->argv[0]);
+
+    if (access(full_path, X_OK) == 0) {
+      // The executable has been found.
+      execve(full_path, command->argv, environ);
+      break;
+    }
+
+    executable = strtok(NULL, ":");
+  }
+
+  // If the executable was not found, print an error message.
+  if (executable == NULL) {
+    fprintf(stderr, "Command '%s' not found.\n", command->argv[0]);
+    return 1;
+  }
+
+  return 0;
+}
+
+int main() {
+  char command_line[1024];
+  char *token;
+
+  while (1) {
+    // Display the prompt and wait for the user to type a command.
+    printf(PROMPT);
+    fflush(stdout);
+    fgets(command_line, sizeof(command_line), stdin);
+
+    // Split the command line into tokens.
+    token = strtok(command_line, "&& ||\n");
+
+    int should_continue = 1;
+    int previous_command_status = 0;
+
+    while (token != NULL && should_continue) {
+      // Parse the current token into a command structure.
+      command_t command;
+      command.argc = 0;
+
+      do {
+        command.argv[command.argc++] = token;
+        token = strtok(NULL, " \t\n");
+      } while (token != NULL && command.argc < 1024);
+
+      command.argv[command.argc] = NULL;
+
+      // Execute the parsed command.
+      int current_command_status = execute_command(&command);
+
+      // Handle logical operators.
+      if (strcmp(token, "&&")
