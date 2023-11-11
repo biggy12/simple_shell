@@ -1,0 +1,28 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <ctype.h>
+
+#define PROMPT "$ "
+
+typedef struct command_t {
+  char *argv[1024];
+  int argc;
+} command_t;
+
+void execute_command_file(const char *filename) {
+  FILE *fp = fopen(filename, "r");
+  if (fp == NULL) {
+    fprintf(stderr, "Error opening file '%s': %s\n", filename, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  char command_line[1024];
+  while (fgets(command_line, sizeof(command_line), fp) != NULL) {
+    // Preprocess the command line (handle comments)
+    preprocess_command(command_line);
+
+    // Parse the command line into tokens and execute the command.
+    command_t
