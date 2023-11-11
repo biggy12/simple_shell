@@ -1,0 +1,32 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void cd(const char *path) {
+  if (path == NULL) {
+    // If no argument is given, change to the user's home directory.
+    path = getenv("HOME");
+    if (path == NULL) {
+      fprintf(stderr, "Cannot determine home directory.\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  char *old_pwd = getcwd(NULL, 0);
+  if (old_pwd == NULL) {
+    perror("getcwd");
+    exit(EXIT_FAILURE);
+  }
+
+  int status = chdir(path);
+  if (status != 0) {
+    perror("chdir");
+    free(old_pwd);
+    exit(EXIT_FAILURE);
+  }
+
+  // Update the PWD environment variable.
+  setenv("PWD", path, 1);
+
+  free(old_pwd);
+}
