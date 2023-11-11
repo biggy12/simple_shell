@@ -1,0 +1,50 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#define PROMPT "$ "
+
+int main() {
+  char command[1024];
+  char *path = getenv("PATH");
+
+  // Display the prompt and wait for the user to type a command.
+  printf(PROMPT);
+  fflush(stdout);
+  fgets(command, sizeof(command), stdin);
+
+  // Remove the newline character from the command.
+  command[strcspn(command, "\n")] = '\0';
+
+  // Check for the `exit` built-in.
+  if (strcmp(command, "exit") == 0) {
+    exit(EXIT_SUCCESS);
+  }
+
+  // Iterate over the PATH variable, looking for the executable.
+  char *executable = strtok(path, ":");
+  while (executable != NULL) {
+    char full_path[1024];
+    snprintf(full_path, sizeof(full_path), "%s/%s", executable, command);
+
+    if (access(full_path, X_OK) == 0) {
+      // The executable has been found.
+      execve(full_path, NULL, environ);
+      break;
+    }
+
+    executable = strtok(NULL, ":");
+  }
+
+  // If the executable was not found, print an error message.
+  if (executable == NULL) {
+    printf("Command '%s' not found.\n", command);
+  }
+
+  // Display the prompt again.
+  printf(PROMPT);
+
+  return EXIT_SUCCESS;
+}
