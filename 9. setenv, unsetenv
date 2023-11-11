@@ -1,0 +1,56 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+extern char **environ;
+
+void setenv(const char *name, const char *value) {
+  for (char **env = environ; *env != NULL; env++) {
+    if (strncmp(*env, name, strlen(name)) == 0) {
+      // Update the existing environment variable.
+      free(*env);
+      *env = malloc(strlen(name) + strlen(value) + 2);
+      if (*env == NULL) {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+      }
+
+      sprintf(*env, "%s=%s", name, value);
+      return;
+    }
+  }
+
+  // Add a new environment variable.
+  environ = realloc(environ, (sizeof(char *) * (sizeof(environ) / sizeof(char *) + 2)));
+  if (environ == NULL) {
+    perror("realloc");
+    exit(EXIT_FAILURE);
+  }
+
+  environ[sizeof(environ) / sizeof(char *) - 2] = malloc(strlen(name) + strlen(value) + 2);
+  if (environ[sizeof(environ) / sizeof(char *) - 2] == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
+
+  sprintf(environ[sizeof(environ) / sizeof(char *) - 2], "%s=%s", name, value);
+  environ[sizeof(environ) / sizeof(char *) - 1] = NULL;
+}
+
+void unsetenv(const char *name) {
+  for (char **env = environ; *env != NULL; env++) {
+    if (strncmp(*env, name, strlen(name)) == 0) {
+      // Remove the environment variable.
+      free(*env);
+
+      for (; *env != NULL; env++) {
+        *env = *(env + 1);
+      }
+
+      return;
+    }
+  }
+
+  // The environment variable does not exist.
+  fprintf(stderr, "Environment variable '%s' does not exist.\n", name);
+}
