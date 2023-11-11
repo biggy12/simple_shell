@@ -1,0 +1,92 @@
+<span class="math-inline">?\ variable, and the `$` variable:
+```c
+#include  "
+
+typedef struct command_t {
+char *argv[1024];
+int argc;
+} command_t;
+
+char *environment[1024];
+int environment_size = 0;
+
+void expand_variables(char *buffer) {
+char *start = buffer;
+char *end = NULL;
+
+while ((start = strchr(start, '$')) != NULL) {
+end = strchr(start + 1, '$') == NULL ? strpbrk(start + 1, " \t\n") : strchr(start + 1, '$');
+if (end == NULL) {
+// The variable name is not terminated
+fprintf(stderr, "Invalid variable reference: '%s'\n", start);
+exit(EXIT_FAILURE);
+}
+char *variable_name = strndup(start + 1, end - start - 1);
+if (variable_name == NULL) {
+perror("strdup");
+exit(EXIT_FAILURE);
+}
+char *variable_value = getenv(variable_name);
+if (variable_value == NULL) {
+variable_value = "";
+}
+int variable_length = strlen(variable_value);
+// Replace the variable reference with the variable value
+memmove(start + variable_length, end + 1, strlen(end));
+memcpy(start, variable_value, variable_length);
+start += variable_length;
+free(variable_name);
+}
+}
+void handle_dollar_question(char *buffer) {
+// Replace `$?` with the exit status of the last command
+int exit_status = WEXITSTATUS(last_command_status);
+char exit_status_string[128];
+sprintf(exit_status_string, "%d", exit_status);
+
+// Replace <span class="math-inline">?\ with the exit status string
+int replaced_length = strlen(exit_status_string);
+memmove(buffer + 2, buffer + 3, strlen(buffer + 2));
+memcpy(buffer, exit_status_string, replaced_length);
+}
+void handle_dollar_dollar(char *buffer) {
+// Replace `‘withthecurrentprocessIDcharpid 
+s
+​
+ tring[128];sprintf(pid 
+s
+​
+ tring,"//Replace‘$` with the PID string
+int replaced_length = strlen(pid_string);
+memmove(buffer + 2, buffer + 3, strlen(buffer + 2));
+memcpy(buffer, pid_string, replaced_length);
+}
+void preprocess_command(char *command_line) {
+expand_variables(command_line);
+// Handle `$?`
+handle_dollar_question(command_line);
+
+// Handle $$
+handle_dollar_dollar(command_line);
+}
+
+int execute_command(command_t *command) {
+if (command->argc == 0) {
+return 0;
+}
+
+char *path = getenv("PATH");
+
+// Iterate over the PATH variable, looking for the executable.
+char *executable = strtok(path, ":");
+while (executable != NULL) {
+char full_path[1024];
+snprintf(full_path, sizeof(full_path), "%s/%s", executable, command->argv[0]);
+
+if (access(full_path, X_OK) == 0) {
+  // The executable has been found.
+  execve(full_path, command->argv, environ);
+  break;
+}
+
+executable = strtok(NULL, ":");
